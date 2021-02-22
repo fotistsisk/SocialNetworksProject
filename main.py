@@ -6,10 +6,11 @@ from bs4 import BeautifulSoup, SoupStrainer
 # class of nodes. I keep the from link and every link that exists inside the from link
 class Node:
 
-    def __init__(self, node_link, category):
+    def __init__(self, node_id, node_link, category):
         self.to_link = set()
         self.node_link = node_link
         self.category = category
+        self.node_id = node_id
 
     def add_link(self, url):
         if self.node_link != url:
@@ -26,6 +27,12 @@ def check_slashes(hrefs):
         return False
     return True
 
+#return id of node to_link
+def node_id_from_link(link):
+  for node in all_nodes:
+      if link==node.node_link:
+          return node.node_id
+  return -1
 
 all_nodes = []  # all the nodes
 already_searched = []  # keep in track the links that we have already examined so we only examine each link only once
@@ -33,18 +40,25 @@ search_list = []  # keep in track the links we need to examine
 base_html = "https://akispetretzikis.com/"  # the links inside the website is stored without the beginning of the url
 http = httplib2.Http()
 # the link from which we begin
-html_string = 'https://akispetretzikis.com/el/categories/almyres-pites-tartes/kotopitakia-me-saltsa-caesar'
+html_string = 'https://akispetretzikis.com/el/categories/glyka/paradosiako-mwsaiko'
+search_list.append(html_string)
+html_string = 'https://akispetretzikis.com/el/categories/pswmia-zymes/chwriatiko-pswmi'
+search_list.append(html_string)
+html_string = 'https://akispetretzikis.com/el/categories/zymarika/makaronia-me-kima'
+search_list.append(html_string)
+html_string = 'https://akispetretzikis.com/el/categories/almyres-pites-tartes/chwriatikh-kotopita'
 search_list.append(html_string)
 
 # while we have links to examine
+counter = 0
 while search_list:
     current_http = search_list.pop()
     # if we already have examined a link we do not need to examine it twice
     if current_http in already_searched:
         continue
-
+    counter +=1
     # create a node for every url we want to examine
-    node = Node(current_http, current_http.split('/')[-2])
+    node = Node(counter,current_http, current_http.split('/')[-2])
     # get the links of the recipes recommended from the current_http
     response = http.request(current_http, 'GET')[1].decode()
     soup = BeautifulSoup(response, features="html.parser")
@@ -65,19 +79,39 @@ while search_list:
     # know which urls we have examined
     already_searched.append(current_http)
 
-# list which we will write to the csv file
-row_list = [["Category", "Source", "Target"]]
+# list which we will write to the csv file with the categories
+row_list_nodes = [["Id", "Category", "Label"]]
+counter = 0
+for n in all_nodes:  # for every node
+    from_link = n.node_link
+    row_list_nodes.append(
+        [n.node_id, n.category, from_link.split('/')[-1]])
+
+# write the row_list to a csv file called gephi_categories.csv
+with open('gephi_categories.csv', 'w', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerows(row_list_nodes)
+
+# list which we will write to the csv file for the relations
+row_list_edges = [["Source", "Target"]]
 counter = 0
 for n in all_nodes:  # for every node
     from_link = n.node_link
     for to_link_url in n.to_link:  # for every link from that comes from every url we have examined
-        row_list.append(
-            [n.category, from_link.split('/')[-1], to_link_url.split('/')[-1]])
+        id_from_link = node_id_from_link(to_link_url)
+        if id_from_link!=-1:
+            row_list_edges.append(
+                [n.node_id, id_from_link])
 
+        ##row_list_edges.append(
+         ##   [n.node_id, node_id_from_link(to_link_url.split('/')[-1])])
 
-# write the row_list to a csv file called gephi.csv
-with open('gephi.csv', 'w', newline='') as file:
+# write the row_list to a csv file called gephi_relations.csv
+with open('gephi_relations.csv', 'w', newline='') as file:
     writer = csv.writer(file)
-    writer.writerows(row_list)
+    writer.writerows(row_list_edges)
+
 
 print("Done writing the csv file")
+
+
