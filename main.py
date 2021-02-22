@@ -6,12 +6,14 @@ from bs4 import BeautifulSoup, SoupStrainer
 # class of nodes. I keep the from link and every link that exists inside the from link
 class Node:
 
-    def __init__(self, from_link):
+    def __init__(self, node_link, category):
         self.to_link = set()
-        self.from_link = from_link
+        self.node_link = node_link
+        self.category = category
 
     def add_link(self, url):
-        self.to_link.add(url)
+        if self.node_link != url:
+            self.to_link.add(url)
 
 
 # we need to check the slashes in order to distinguish the recipe links from the general category links
@@ -40,8 +42,9 @@ while search_list:
     # if we already have examined a link we do not need to examine it twice
     if current_http in already_searched:
         continue
+
     # create a node for every url we want to examine
-    node = Node(current_http)
+    node = Node(current_http, current_http.split('/')[-2])
     # get the links of the recipes recommended from the current_http
     response = http.request(current_http, 'GET')[1].decode()
     soup = BeautifulSoup(response, features="html.parser")
@@ -63,13 +66,18 @@ while search_list:
     already_searched.append(current_http)
 
 # list which we will write to the csv file
-row_list = []
+row_list = [["Category", "Source", "Target"]]
+counter = 0
 for n in all_nodes:  # for every node
-    from_link = n.from_link
+    from_link = n.node_link
     for to_link_url in n.to_link:  # for every link from that comes from every url we have examined
-        row_list.append([from_link.split('/')[-1], to_link_url.split('/')[-1]]) # add the title of every link not the whole link
+        row_list.append(
+            [n.category, from_link.split('/')[-1], to_link_url.split('/')[-1]])
+
 
 # write the row_list to a csv file called gephi.csv
 with open('gephi.csv', 'w', newline='') as file:
     writer = csv.writer(file)
     writer.writerows(row_list)
+
+print("Done writing the csv file")
